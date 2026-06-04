@@ -133,10 +133,8 @@ Run all cells top to bottom. This will:
 
 ## 👤 Author
 
-**[Your Name]**  
+**[Ankit Mukherjee]**  
 Data Analyst Portfolio Project  
-[LinkedIn] | [GitHub]
-
 ---
 
 *Tools: Python | SQL | Power BI | scikit-learn | pandas | matplotlib | seaborn*
