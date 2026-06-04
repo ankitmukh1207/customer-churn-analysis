@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Customer Churn Analysis — Telco</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+:root {
+  --bg: #0d0f14;
+  --surface: #13161d;
+  --surface2: #1a1e28;
+  --border: rgba(255,255,255,0.07);
+  --border2: rgba(255,255,255,0.12);
+  --text: #f0f2f7;
+  --muted: #7a8099;
+  --muted2: #4a5068;
+  --red: #e05252;
+  --red-dim: rgba(224,82,82,0.12);
+  --amber: #e8943a;
+  --amber-dim: rgba(232,148,58,0.12);
+  --green: #3ec98e;
+  --green-dim: rgba(62,201,142,0.12);
+  --blue: #5b8af5;
+  --blue-dim: rgba(91,138,245,0.12);
+  --accent: #5b8af5;
+  --font: 'DM Sans', sans-serif;
+  --mono: 'DM Mono', monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14px;line-height:1.6;min-height:100vh}
+body{display:flex;flex-direction:column}
+
+/* TOP BAR */
+.topbar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 32px;height:56px;
+  border-bottom:1px solid var(--border);
+  background:var(--surface);
+  position:sticky;top:0;z-index:100;
+}
+.topbar-left{display:flex;align-items:center;gap:16px}
+.logo{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;letter-spacing:.02em;color:var(--text)}
+.logo-dot{width:8px;height:8px;border-radius:50%;background:var(--accent)}
+.breadcrumb{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:12px}
+.breadcrumb span:last-child{color:var(--text)}
+.topbar-right{display:flex;align-items:center;gap:12px}
+.badge-live{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--green);font-family:var(--mono);background:var(--green-dim);padding:3px 9px;border-radius:4px;border:1px solid rgba(62,201,142,0.2)}
+.badge-live::before{content:'';width:5px;height:5px;border-radius:50%;background:var(--green);animation:pulse 2s ease infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.dataset-label{font-size:11px;color:var(--muted);font-family:var(--mono)}
+
+/* NAV TABS */
+.tabs{display:flex;align-items:center;gap:2px;padding:0 32px;border-bottom:1px solid var(--border);background:var(--surface)}
+.tab{padding:12px 16px;font-size:13px;font-weight:400;color:var(--muted);cursor:pointer;border:none;background:none;border-bottom:2px solid transparent;margin-bottom:-1px;transition:color .15s;white-space:nowrap}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--text);border-bottom-color:var(--accent);font-weight:500}
+.tab-icon{margin-right:6px;font-size:12px}
+
+/* MAIN */
+.main{flex:1;padding:28px 32px;max-width:1280px;width:100%}
+.page{display:none;animation:fadeIn .2s ease}
+.page.active{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+
+/* PAGE HEADER */
+.page-header{margin-bottom:24px}
+.page-title{font-size:20px;font-weight:600;color:var(--text);letter-spacing:-.02em}
+.page-subtitle{font-size:13px;color:var(--muted);margin-top:3px}
+
+/* KPI STRIP */
+.kpi-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px}
+.kpi-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px 18px;position:relative;overflow:hidden}
+.kpi-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;border-radius:10px 10px 0 0}
+.kpi-card.red::before{background:var(--red)}
+.kpi-card.amber::before{background:var(--amber)}
+.kpi-card.green::before{background:var(--green)}
+.kpi-card.blue::before{background:var(--blue)}
+.kpi-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:500;margin-bottom:6px}
+.kpi-value{font-size:26px;font-weight:600;letter-spacing:-.03em;line-height:1}
+.kpi-value.red{color:var(--red)}.kpi-value.amber{color:var(--amber)}.kpi-value.green{color:var(--green)}.kpi-value.blue{color:var(--blue)}
+.kpi-meta{font-size:11px;color:var(--muted);margin-top:5px;display:flex;align-items:center;gap:5px}
+.kpi-delta{font-size:11px;font-weight:500;padding:1px 5px;border-radius:3px}
+.kpi-delta.neg{background:var(--red-dim);color:var(--red)}
+.kpi-delta.pos{background:var(--green-dim);color:var(--green)}
+
+/* GRID LAYOUTS */
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:16px}
+.grid-3-1{display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-bottom:16px}
+
+/* PANELS */
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px 20px}
+.panel-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.panel-title{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.07em}
+.panel-tag{font-size:10px;font-family:var(--mono);color:var(--muted);background:var(--surface2);padding:2px 7px;border-radius:3px;border:1px solid var(--border)}
+
+/* BAR ROWS */
+.bar-row{display:flex;align-items:center;gap:10px;margin-bottom:9px}
+.bar-row:last-child{margin-bottom:0}
+.bar-name{font-size:12px;color:var(--muted);width:120px;flex-shrink:0;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar-name.left{text-align:left;width:90px}
+.bar-track{flex:1;height:6px;background:var(--surface2);border-radius:3px;overflow:hidden}
+.bar-fill{height:100%;border-radius:3px;transition:width .5s cubic-bezier(.4,0,.2,1)}
+.bar-pct{font-size:12px;font-weight:500;font-family:var(--mono);color:var(--text);width:40px;text-align:right}
+.bar-count{font-size:11px;color:var(--muted2);width:42px;text-align:right}
+
+/* DIVIDER */
+.divider{height:1px;background:var(--border);margin:16px 0}
+
+/* FEATURE GRID */
+.feat-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.feat-card{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px 14px}
+.feat-name{font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px}
+.feat-compare{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.feat-stat{background:var(--surface);border-radius:6px;padding:8px 10px;text-align:center;border:1px solid var(--border)}
+.feat-num{font-size:18px;font-weight:600;font-family:var(--mono);letter-spacing:-.02em}
+.feat-num.good{color:var(--green)}.feat-num.bad{color:var(--red)}
+.feat-lbl{font-size:10px;color:var(--muted);margin-top:2px}
+.feat-savings{margin-top:10px;font-size:11px;color:var(--muted);display:flex;align-items:center;gap:4px}
+.savings-val{color:var(--green);font-weight:500;font-family:var(--mono)}
+
+/* RISK CARDS */
+.risk-row{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px}
+.risk-card{border-radius:10px;padding:16px 18px;border:1px solid transparent;position:relative}
+.risk-card.high{background:rgba(224,82,82,0.08);border-color:rgba(224,82,82,0.2)}
+.risk-card.med{background:rgba(232,148,58,0.08);border-color:rgba(232,148,58,0.2)}
+.risk-card.low{background:rgba(62,201,142,0.08);border-color:rgba(62,201,142,0.2)}
+.risk-num{font-size:28px;font-weight:600;font-family:var(--mono);letter-spacing:-.03em}
+.risk-num.high{color:var(--red)}.risk-num.med{color:var(--amber)}.risk-num.low{color:var(--green)}
+.risk-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-top:2px}
+.risk-label.high{color:rgba(224,82,82,0.7)}.risk-label.med{color:rgba(232,148,58,0.7)}.risk-label.low{color:rgba(62,201,142,0.7)}
+.risk-sub{font-size:11px;color:var(--muted);margin-top:6px}
+
+/* ACTION ROWS */
+.action-row{display:flex;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid var(--border)}
+.action-row:last-child{border-bottom:none}
+.action-icon{width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0}
+.action-text{flex:1;font-size:12px;color:var(--text);line-height:1.3}
+.action-bar-wrap{width:100px;height:4px;background:var(--surface2);border-radius:2px;overflow:hidden;flex-shrink:0}
+.action-bar-fill{height:100%;border-radius:2px}
+.action-count{font-size:12px;font-weight:500;font-family:var(--mono);color:var(--muted);width:38px;text-align:right;flex-shrink:0}
+
+/* TRIGGER TABLE */
+.trigger-table{width:100%;border-collapse:collapse}
+.trigger-table th{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--muted2);padding:7px 10px;text-align:left;border-bottom:1px solid var(--border)}
+.trigger-table td{font-size:12px;color:var(--text);padding:9px 10px;border-bottom:1px solid var(--border);vertical-align:top}
+.trigger-table tr:last-child td{border-bottom:none}
+.trigger-table td:first-child{color:var(--muted);width:160px}
+.tag{display:inline-block;font-size:10px;font-family:var(--mono);padding:2px 7px;border-radius:3px;border:1px solid;white-space:nowrap}
+.tag.red{color:var(--red);border-color:rgba(224,82,82,0.3);background:var(--red-dim)}
+.tag.amber{color:var(--amber);border-color:rgba(232,148,58,0.3);background:var(--amber-dim)}
+.tag.green{color:var(--green);border-color:rgba(62,201,142,0.3);background:var(--green-dim)}
+.tag.blue{color:var(--blue);border-color:rgba(91,138,245,0.3);background:var(--blue-dim)}
+
+/* CHART WRAPPERS */
+.chart-wrap{position:relative;width:100%}
+
+/* FOOTER */
+.footer{padding:16px 32px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;font-size:11px;color:var(--muted);background:var(--surface)}
+.footer-left{display:flex;gap:20px}
+.footer-stat{display:flex;gap:5px}
+.footer-stat span:first-child{color:var(--muted2)}
+.footer-stat span:last-child{font-family:var(--mono);font-weight:500}
+
+/* LEGEND */
+.legend{display:flex;gap:14px;margin-bottom:12px}
+.leg{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted)}
+.leg-sq{width:8px;height:8px;border-radius:2px;flex-shrink:0}
+
+/* STAT ROW */
+.stat-row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)}
+.stat-row:last-child{border-bottom:none}
+.stat-key{font-size:12px;color:var(--muted)}
+.stat-val{font-size:12px;font-weight:500;font-family:var(--mono);color:var(--text)}
+
+/* INSIGHT BOX */
+.insight{background:var(--blue-dim);border:1px solid rgba(91,138,245,0.2);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--text);line-height:1.5;margin-top:12px}
+.insight strong{color:var(--blue)}
+
+/* SCROLLBAR */
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:var(--surface)}
+::-webkit-scrollbar-thumb{background:var(--muted2);border-radius:3px}
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="topbar-left">
+    <div class="logo"><div class="logo-dot"></div>DataStudio</div>
+    <div class="breadcrumb">
+      <span>Analytics</span>
+      <span style="color:var(--muted2)">›</span>
+      <span>Customer Retention</span>
+      <span style="color:var(--muted2)">›</span>
+      <span>Churn Analysis</span>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <div class="badge-live">Live</div>
+    <div class="dataset-label">Telco · 7,043 records · 21 cols</div>
+  </div>
+</div>
+
+<!-- TABS -->
+<div class="tabs">
+  <button class="tab active" onclick="showPage('overview',this)"><span class="tab-icon">◈</span>Overview</button>
+  <button class="tab" onclick="showPage('trends',this)"><span class="tab-icon">◎</span>Trend analysis</button>
+  <button class="tab" onclick="showPage('features',this)"><span class="tab-icon">◧</span>Feature usage</button>
+  <button class="tab" onclick="showPage('playbook',this)"><span class="tab-icon">◉</span>Churn playbook</button>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- PAGE: OVERVIEW -->
+  <div id="page-overview" class="page active">
+    <div class="page-header">
+      <div class="page-title">Why are we losing customers?</div>
+      <div class="page-subtitle">Churn deep dive — Telco customer base analysis, Q4 snapshot</div>
+    </div>
+
+    <div class="kpi-strip">
+      <div class="kpi-card red">
+        <div class="kpi-label">Churn rate</div>
+        <div class="kpi-value red">26.5%</div>
+        <div class="kpi-meta"><span class="kpi-delta neg">↑ 4.5pp</span> above industry avg</div>
+      </div>
+      <div class="kpi-card red">
+        <div class="kpi-label">Monthly revenue lost</div>
+        <div class="kpi-value red">$139K</div>
+        <div class="kpi-meta">1,869 churned customers</div>
+      </div>
+      <div class="kpi-card amber">
+        <div class="kpi-label">Annual revenue at risk</div>
+        <div class="kpi-value amber">$1.67M</div>
+        <div class="kpi-meta">projected annual loss</div>
+      </div>
+      <div class="kpi-card green">
+        <div class="kpi-label">Retained customers</div>
+        <div class="kpi-value green">5,174</div>
+        <div class="kpi-meta"><span class="kpi-delta pos">73.5%</span> retention rate</div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">Churn by contract type</div>
+          <div class="panel-tag">n = 7,043</div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-name">Month-to-month</div>
+          <div class="bar-track"><div class="bar-fill" style="width:100%;background:var(--red)"></div></div>
+          <div class="bar-pct">42.7%</div>
+          <div class="bar-count">3,875</div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-name">One year</div>
+          <div class="bar-track"><div class="bar-fill" style="width:26.5%;background:var(--amber)"></div></div>
+          <div class="bar-pct">11.3%</div>
+          <div class="bar-count">1,473</div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-name">Two year</div>
+          <div class="bar-track"><div class="bar-fill" style="width:6.5%;background:var(--green)"></div></div>
+          <div class="bar-pct">2.8%</div>
+          <div class="bar-count">1,695</div>
+        </div>
+        <div class="insight"><strong>Key insight:</strong> Month-to-month customers are 15× more likely to churn than two-year contract holders.</div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">Churn by payment method</div>
+          <div class="panel-tag">4 methods</div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-name">Electronic check</div>
+          <div class="bar-track"><div class="bar-fill" style="width:100%;background:var(--red)"></div></div>
+          <div class="bar-pct">45.3%</div>
+          <div class="bar-count">2,365</div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-name">Mailed check</div>
+          <div class="bar-track"><div class="bar-fill" style="width:42%;background:var(--amber)"></div></div>
+          <div class="bar-pct">19.1%</div>
+          <div class="bar-count">1,612</div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-name">Bank transfer</div>
+          <div class="bar-track"><div class="bar-fill" style="width:37%;background:var(--blue)"></div></div>
+          <div class="bar-pct">16.7%</div>
+          <div class="bar-count">1,544</div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-name">Credit card</div>
+          <div class="bar-track"><div class="bar-fill" style="width:33.5%;background:var(--blue)"></div></div>
+          <div class="bar-pct">15.2%</div>
+          <div class="bar-count">1,522</div>
+        </div>
+        <div class="insight"><strong>Key insight:</strong> Electronic check users churn 3× more than credit card users. Encourage auto-pay enrollment.</div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">Churn by internet service</div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-name">Fiber optic</div>
+          <div class="bar-track"><div class="bar-fill" style="width:100%;background:var(--red)"></div></div>
+          <div class="bar-pct">41.9%</div>
+          <div class="bar-count">3,096</div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-name">DSL</div>
+          <div class="bar-track"><div class="bar-fill" style="width:45%;background:var(--amber)"></div></div>
+          <div class="bar-pct">19.0%</div>
+          <div class="bar-count">2,421</div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-name">No internet</div>
+          <div class="bar-track"><div class="bar-fill" style="width:17.5%;background:var(--green)"></div></div>
+          <div class="bar-pct">7.4%</div>
+          <div class="bar-count">1,526</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">Key statistics</div>
+        </div>
+        <div class="stat-row"><div class="stat-key">Avg tenure (churned)</div><div class="stat-val">18.0 mo</div></div>
+        <div class="stat-row"><div class="stat-key">Avg tenure (retained)</div><div class="stat-val">37.6 mo</div></div>
+        <div class="stat-row"><div class="stat-key">Avg monthly charge (churned)</div><div class="stat-val">$74.44</div></div>
+        <div class="stat-row"><div class="stat-key">Avg monthly charge (retained)</div><div class="stat-val">$61.27</div></div>
+        <div class="stat-row"><div class="stat-key">Senior citizen churn rate</div><div class="stat-val">41.7%</div></div>
+        <div class="stat-row"><div class="stat-key">Paperless billing churn</div><div class="stat-val">33.6%</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PAGE: TRENDS -->
+  <div id="page-trends" class="page">
+    <div class="page-header">
+      <div class="page-title">Trend analysis</div>
+      <div class="page-subtitle">Churn behaviour over customer lifetime and charge distribution</div>
+    </div>
+
+    <div class="kpi-strip" style="grid-template-columns:repeat(3,1fr)">
+      <div class="kpi-card red">
+        <div class="kpi-label">Highest risk period</div>
+        <div class="kpi-value red">56.2%</div>
+        <div class="kpi-meta">0–3 month customers</div>
+      </div>
+      <div class="kpi-card green">
+        <div class="kpi-label">Lowest churn period</div>
+        <div class="kpi-value green">9.5%</div>
+        <div class="kpi-meta">49+ month loyalists</div>
+      </div>
+      <div class="kpi-card blue">
+        <div class="kpi-label">Lifetime churn drop</div>
+        <div class="kpi-value blue">46.7pp</div>
+        <div class="kpi-meta">from onboarding to loyal</div>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-bottom:16px">
+      <div class="panel-header">
+        <div class="panel-title">Churn rate by tenure period</div>
+        <div class="panel-tag">monthly cohort proxy</div>
+      </div>
+      <div class="chart-wrap" style="height:240px">
+        <canvas id="tenureChart" role="img" aria-label="Bar chart showing churn rate by tenure period. Declines from 56.2% at 0-3 months to 9.5% at 49+ months.">Churn declines with customer age: 56.2% at 0-3 months, 9.5% at 49+ months.</canvas>
+      </div>
+      <div class="insight" style="margin-top:12px"><strong>Root cause:</strong> New customer churn rate is 5.9× higher than long-term customers. Onboarding experience is the #1 lever to improve.</div>
+    </div>
+
+    <div class="grid-2">
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">Monthly charges — retained vs churned</div>
+        </div>
+        <div class="legend">
+          <div class="leg"><div class="leg-sq" style="background:var(--green)"></div>Retained</div>
+          <div class="leg"><div class="leg-sq" style="background:var(--red)"></div>Churned</div>
+        </div>
+        <div class="chart-wrap" style="height:200px">
+          <canvas id="chargesChart" role="img" aria-label="Histogram comparing monthly charges distribution for retained versus churned customers.">Churned customers cluster at higher monthly charges.</canvas>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">Churn rate by charge tier</div>
+        </div>
+        <div class="bar-row"><div class="bar-name">$80–120/mo</div><div class="bar-track"><div class="bar-fill" style="width:100%;background:var(--red)"></div></div><div class="bar-pct">~38%</div></div>
+        <div class="bar-row"><div class="bar-name">$60–80/mo</div><div class="bar-track"><div class="bar-fill" style="width:75%;background:var(--amber)"></div></div><div class="bar-pct">~28%</div></div>
+        <div class="bar-row"><div class="bar-name">$40–60/mo</div><div class="bar-track"><div class="bar-fill" style="width:42%;background:var(--amber)"></div></div><div class="bar-pct">~18%</div></div>
+        <div class="bar-row"><div class="bar-name">$20–40/mo</div><div class="bar-track"><div class="bar-fill" style="width:24%;background:var(--green)"></div></div><div class="bar-pct">~11%</div></div>
+        <div class="bar-row"><div class="bar-name">$0–20/mo</div><div class="bar-track"><div class="bar-fill" style="width:13%;background:var(--green)"></div></div><div class="bar-pct">~6%</div></div>
+        <div class="insight"><strong>Pattern:</strong> Higher-paying customers churn more — suggests value-for-money perception issues at the premium tier.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PAGE: FEATURES -->
+  <div id="page-features" class="page">
+    <div class="page-header">
+      <div class="page-title">Feature usage analysis</div>
+      <div class="page-subtitle">Impact of service adoption on customer churn probability</div>
+    </div>
+
+    <div class="panel" style="margin-bottom:16px">
+      <div class="panel-header">
+        <div class="panel-title">Feature adoption vs churn rate</div>
+        <div class="panel-tag">4 key features</div>
+      </div>
+      <div class="feat-grid">
+        <div class="feat-card">
+          <div class="feat-name">Online security</div>
+          <div class="feat-compare">
+            <div class="feat-stat"><div class="feat-num good">14.6%</div><div class="feat-lbl">With feature</div></div>
+            <div class="feat-stat"><div class="feat-num bad">41.8%</div><div class="feat-lbl">Without feature</div></div>
+          </div>
+          <div class="feat-savings"><span class="savings-val">↓ 27.2pp</span> reduction in churn</div>
+        </div>
+        <div class="feat-card">
+          <div class="feat-name">Tech support</div>
+          <div class="feat-compare">
+            <div class="feat-stat"><div class="feat-num good">15.2%</div><div class="feat-lbl">With feature</div></div>
+            <div class="feat-stat"><div class="feat-num bad">41.6%</div><div class="feat-lbl">Without feature</div></div>
+          </div>
+          <div class="feat-savings"><span class="savings-val">↓ 26.4pp</span> reduction in churn</div>
+        </div>
+        <div class="feat-card">
+          <div class="feat-name">Online backup</div>
+          <div class="feat-compare">
+            <div class="feat-stat"><div class="feat-num good">21.5%</div><div class="feat-lbl">With feature</div></div>
+            <div class="feat-stat"><div class="feat-num bad">39.9%</div><div class="feat-lbl">Without feature</div></div>
+          </div>
+          <div class="feat-savings"><span class="savings-val">↓ 18.4pp</span> reduction in churn</div>
+        </div>
+        <div class="feat-card">
+          <div class="feat-name">Device protection</div>
+          <div class="feat-compare">
+            <div class="feat-stat"><div class="feat-num good">22.5%</div><div class="feat-lbl">With feature</div></div>
+            <div class="feat-stat"><div class="feat-num bad">39.1%</div><div class="feat-lbl">Without feature</div></div>
+          </div>
+          <div class="feat-savings"><span class="savings-val">↓ 16.6pp</span> reduction in churn</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">Feature impact comparison</div>
+      </div>
+      <div class="legend">
+        <div class="leg"><div class="leg-sq" style="background:var(--green)"></div>Adopted</div>
+        <div class="leg"><div class="leg-sq" style="background:var(--red)"></div>Not adopted</div>
+      </div>
+      <div class="chart-wrap" style="height:220px">
+        <canvas id="featChart" role="img" aria-label="Grouped bar chart comparing churn rates for customers who have adopted each feature versus those who have not.">All four features show significant churn reduction when adopted.</canvas>
+      </div>
+      <div class="insight"><strong>Recommendation:</strong> Proactively offer OnlineSecurity and TechSupport to fiber optic customers — the combination addresses the top two churn drivers simultaneously.</div>
+    </div>
+  </div>
+
+  <!-- PAGE: PLAYBOOK -->
+  <div id="page-playbook" class="page">
+    <div class="page-header">
+      <div class="page-title">Churn playbook</div>
+      <div class="page-subtitle">ML-scored risk levels and recommended retention actions for active customers</div>
+    </div>
+
+    <div class="risk-row">
+      <div class="risk-card high">
+        <div class="risk-num high">66</div>
+        <div class="risk-label high">High risk</div>
+        <div class="risk-sub">Churn prob. &gt; 60%<br>Immediate action needed</div>
+      </div>
+      <div class="risk-card med">
+        <div class="risk-num med">247</div>
+        <div class="risk-label med">Medium risk</div>
+        <div class="risk-sub">Churn prob. 30–60%<br>Proactive outreach</div>
+      </div>
+      <div class="risk-card low">
+        <div class="risk-num low">3,736</div>
+        <div class="risk-label low">Low risk</div>
+        <div class="risk-sub">Churn prob. &lt; 30%<br>Monitor &amp; retain</div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">Recommended actions — active customers</div>
+          <div class="panel-tag">n = 5,174</div>
+        </div>
+        <div class="action-row">
+          <div class="action-icon" style="background:var(--blue-dim)">◈</div>
+          <div class="action-text">Monitor — stable, low-risk customers</div>
+          <div class="action-bar-wrap"><div class="action-bar-fill" style="width:100%;background:var(--blue)"></div></div>
+          <div class="action-count">2,247</div>
+        </div>
+        <div class="action-row">
+          <div class="action-icon" style="background:var(--red-dim)">◉</div>
+          <div class="action-text">Offer OnlineSecurity add-on</div>
+          <div class="action-bar-wrap"><div class="action-bar-fill" style="width:57%;background:var(--red)"></div></div>
+          <div class="action-count">1,288</div>
+        </div>
+        <div class="action-row">
+          <div class="action-icon" style="background:var(--amber-dim)">◎</div>
+          <div class="action-text">Assign dedicated support agent</div>
+          <div class="action-bar-wrap"><div class="action-bar-fill" style="width:37%;background:var(--amber)"></div></div>
+          <div class="action-count">831</div>
+        </div>
+        <div class="action-row">
+          <div class="action-icon" style="background:var(--amber-dim)">◧</div>
+          <div class="action-text">Send re-engagement email</div>
+          <div class="action-bar-wrap"><div class="action-bar-fill" style="width:19%;background:var(--amber)"></div></div>
+          <div class="action-count">430</div>
+        </div>
+        <div class="action-row">
+          <div class="action-icon" style="background:var(--green-dim)">◫</div>
+          <div class="action-text">Offer annual plan discount</div>
+          <div class="action-bar-wrap"><div class="action-bar-fill" style="width:17%;background:var(--green)"></div></div>
+          <div class="action-count">376</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">Trigger rules &amp; escalation logic</div>
+        </div>
+        <table class="trigger-table">
+          <thead>
+            <tr><th>Condition</th><th>Action</th><th>Priority</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Tenure ≤ 3 mo + MTM contract</td>
+              <td>Re-engagement email</td>
+              <td><span class="tag amber">Medium</span></td>
+            </tr>
+            <tr>
+              <td>Charges &gt; $80 + no TechSupport</td>
+              <td>Assign support agent</td>
+              <td><span class="tag red">High</span></td>
+            </tr>
+            <tr>
+              <td>No OnlineSecurity + has internet</td>
+              <td>Offer security add-on</td>
+              <td><span class="tag red">High</span></td>
+            </tr>
+            <tr>
+              <td>Tenure &gt; 12 mo + MTM contract</td>
+              <td>Annual plan discount</td>
+              <td><span class="tag amber">Medium</span></td>
+            </tr>
+            <tr>
+              <td>ML score &gt; 60%</td>
+              <td>Urgent retention call</td>
+              <td><span class="tag red">Critical</span></td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="insight" style="margin-top:14px"><strong>Model:</strong> Random Forest · ROC-AUC 0.843 · Tools: Python, SQL, Power BI</div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<!-- FOOTER -->
+<div class="footer">
+  <div class="footer-left">
+    <div class="footer-stat"><span>Dataset</span><span>WA_Fn-UseC_-Telco-Customer-Churn</span></div>
+    <div class="footer-stat"><span>Records</span><span>7,043</span></div>
+    <div class="footer-stat"><span>Features</span><span>21</span></div>
+    <div class="footer-stat"><span>Model</span><span>RandomForest · AUC 0.843</span></div>
+  </div>
+  <div style="color:var(--muted2);font-family:var(--mono)">Customer Churn Analysis · 2026</div>
+</div>
+
+<script>
+function showPage(id, btn) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-' + id).classList.add('active');
+  btn.classList.add('active');
+  setTimeout(() => {
+    if (id === 'trends' && !window.trendsDrawn) { drawTrends(); window.trendsDrawn = true; }
+    if (id === 'features' && !window.featDrawn) { drawFeatures(); window.featDrawn = true; }
+  }, 50);
+}
+
+const gridColor = 'rgba(255,255,255,0.05)';
+const labelColor = '#7a8099';
+const tickFont = { family: "'DM Mono', monospace", size: 11 };
+
+function drawTrends() {
+  new Chart(document.getElementById('tenureChart'), {
+    type: 'bar',
+    data: {
+      labels: ['0–3 mo', '4–6 mo', '7–12 mo', '13–24 mo', '25–48 mo', '49+ mo'],
+      datasets: [{
+        label: 'Churn rate',
+        data: [56.2, 44.6, 35.9, 28.7, 20.4, 9.5],
+        backgroundColor: ['#e05252','#e05252','#e8943a','#e8943a','#3ec98e','#3ec98e'],
+        borderRadius: 5,
+        borderSkipped: false
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: v => ' ' + v.parsed.y + '%' }, backgroundColor: '#1a1e28', titleColor: '#f0f2f7', bodyColor: '#7a8099', borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1 }
+      },
+      scales: {
+        y: { grid: { color: gridColor }, ticks: { color: labelColor, font: tickFont, callback: v => v + '%' }, max: 65, border: { display: false } },
+        x: { grid: { display: false }, ticks: { color: labelColor, font: tickFont }, border: { display: false } }
+      }
+    }
+  });
+
+  new Chart(document.getElementById('chargesChart'), {
+    type: 'bar',
+    data: {
+      labels: ['$0-20','$20-40','$40-60','$60-80','$80-100','$100-120'],
+      datasets: [
+        { label: 'Retained', data: [312, 890, 1120, 1540, 980, 332], backgroundColor: 'rgba(62,201,142,0.4)', borderColor: '#3ec98e', borderWidth: 1, borderRadius: 3 },
+        { label: 'Churned', data: [48, 120, 180, 510, 680, 331], backgroundColor: 'rgba(224,82,82,0.4)', borderColor: '#e05252', borderWidth: 1, borderRadius: 3 }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { backgroundColor: '#1a1e28', titleColor: '#f0f2f7', bodyColor: '#7a8099', borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1 } },
+      scales: {
+        y: { grid: { color: gridColor }, ticks: { color: labelColor, font: tickFont }, border: { display: false } },
+        x: { grid: { display: false }, ticks: { color: labelColor, font: tickFont }, border: { display: false } }
+      }
+    }
+  });
+}
+
+function drawFeatures() {
+  new Chart(document.getElementById('featChart'), {
+    type: 'bar',
+    data: {
+      labels: ['Online security', 'Tech support', 'Online backup', 'Device protection'],
+      datasets: [
+        { label: 'Adopted', data: [14.6, 15.2, 21.5, 22.5], backgroundColor: '#3ec98e', borderRadius: 4, borderSkipped: false },
+        { label: 'Not adopted', data: [41.8, 41.6, 39.9, 39.1], backgroundColor: '#e05252', borderRadius: 4, borderSkipped: false }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: v => ' ' + v.dataset.label + ': ' + v.parsed.y + '%' }, backgroundColor: '#1a1e28', titleColor: '#f0f2f7', bodyColor: '#7a8099', borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1 } },
+      scales: {
+        y: { grid: { color: gridColor }, ticks: { color: labelColor, font: tickFont, callback: v => v + '%' }, max: 50, border: { display: false } },
+        x: { grid: { display: false }, ticks: { color: labelColor, font: tickFont, maxRotation: 0 }, border: { display: false } }
+      }
+    }
+  });
+}
+</script>
+</body>
+</html>
